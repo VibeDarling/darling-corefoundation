@@ -146,7 +146,7 @@ NSString *const NSURLVolumeAvailableCapacityForOpportunisticUsageKey = @"NSURLVo
 NSString *const NSURLVolumeIsEncryptedKey = @"NSURLVolumeIsEncryptedKey";
 NSString *const NSURLVolumeIsRootFileSystemKey = @"NSURLVolumeIsRootFileSystemKey";
 
-
+NSURLUbiquitousItemDownloadingStatus const NSURLUbiquitousItemDownloadingStatusNotDownloaded = @"NSURLUbiquitousItemDownloadingStatusNotDownloaded";
 
 static void posixError(CFErrorRef *error) {
     const CFStringRef keys[1] = {
