@@ -93,6 +93,13 @@ NSString *const NSURLVolumeSupportsVolumeSizesKey = @"NSURLVolumeSupportsVolumeS
 NSString *const NSURLVolumeSupportsRenamingKey = @"NSURLVolumeSupportsRenamingKey";
 NSString *const NSURLVolumeSupportsAdvisoryFileLockingKey = @"NSURLVolumeSupportsAdvisoryFileLockingKey";
 NSString *const NSURLVolumeSupportsExtendedSecurityKey = @"NSURLVolumeSupportsExtendedSecurityKey";
+NSString *const NSURLVolumeSupportsCompressionKey = @"NSURLVolumeSupportsCompressionKey";
+NSString *const NSURLVolumeSupportsFileCloningKey = @"NSURLVolumeSupportsFileCloningKey";
+NSString *const NSURLVolumeSupportsSwapRenamingKey = @"NSURLVolumeSupportsSwapRenamingKey";
+NSString *const NSURLVolumeSupportsExclusiveRenamingKey = @"NSURLVolumeSupportsExclusiveRenamingKey";
+NSString *const NSURLVolumeSupportsImmutableFilesKey = @"NSURLVolumeSupportsImmutableFilesKey";
+NSString *const NSURLVolumeSupportsAccessPermissionsKey = @"NSURLVolumeSupportsAccessPermissionsKey";
+NSString *const NSURLVolumeSupportsFileProtectionKey = @"NSURLVolumeSupportsFileProtectionKey";
 NSString *const NSURLVolumeIsBrowsableKey = @"NSURLVolumeIsBrowsableKey";
 NSString *const NSURLVolumeMaximumFileSizeKey = @"NSURLVolumeMaximumFileSizeKey";
 NSString *const NSURLVolumeIsEjectableKey = @"NSURLVolumeIsEjectableKey";
@@ -138,7 +145,6 @@ NSString *const NSURLVolumeAvailableCapacityForImportantUsageKey = @"NSURLVolume
 NSString *const NSURLVolumeAvailableCapacityForOpportunisticUsageKey = @"NSURLVolumeAvailableCapacityForOpportunisticUsageKey";
 NSString *const NSURLVolumeIsEncryptedKey = @"NSURLVolumeIsEncryptedKey";
 NSString *const NSURLVolumeIsRootFileSystemKey = @"NSURLVolumeIsRootFileSystemKey";
-NSString *const NSURLVolumeSupportsCompressionKey = @"NSURLVolumeSupportsCompressionKey";
 
 
 
@@ -536,6 +542,16 @@ static CFTypeRef CFURLCreatePropertyForKey(CFURLRef url, CFStringRef key, CFErro
                 value = CFNumberCreate(kCFAllocatorDefault, kCFNumberLongLongType, &b);
             }
         }
+    }
+    else if (CFEqual(key, kCFURLVolumeSupportsFileCloningKey) ||
+             CFEqual(key, kCFURLVolumeSupportsSwapRenamingKey) ||
+             CFEqual(key, kCFURLVolumeSupportsExclusiveRenamingKey) ||
+             CFEqual(key, kCFURLVolumeSupportsImmutableFilesKey) ||
+             CFEqual(key, kCFURLVolumeSupportsAccessPermissionsKey) ||
+             CFEqual(key, kCFURLVolumeSupportsFileProtectionKey) ||
+             CFEqual(key, kCFURLVolumeSupportsCompressionKey))
+    {
+        value = kCFBooleanFalse;
     }
     else if (CFEqual(key, kCFURLVolumeTotalCapacityKey))
     {
