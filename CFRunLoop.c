@@ -2337,6 +2337,22 @@ static void __CFRunLoopTimeout(void *arg) {
     // The interval is DISPATCH_TIME_FOREVER, so this won't fire again
 }
 
+/* The only thing that ends a finite runMode:beforeDate: activation is its
+ * deadline. Waiting with TIMEOUT_INFINITY and depending on the per-activation
+ * dispatch timer to post the wakeup deadlocks whenever that timer is not
+ * serviced, so derive the wait from the deadline instead. termTSR is a
+ * mach_absolute_time() deadline and mach_msg_timeout_t is a uint32_t of
+ * milliseconds, so deadlines beyond that range keep the unbounded wait. */
+static mach_msg_timeout_t __CFRunLoopWaitTimeout(uint64_t termTSR, Boolean poll) {
+    if (poll) return 0;
+    uint64_t nowTSR = mach_absolute_time();
+    if (termTSR <= nowTSR) return 0;	// deadline already passed, do not block
+    CFTimeInterval remaining = __CFTSRToTimeInterval(termTSR - nowTSR);
+    if (remaining >= (CFTimeInterval)UINT32_MAX / 1000.0) return TIMEOUT_INFINITY;
+    mach_msg_timeout_t timeout = (mach_msg_timeout_t)(remaining * 1000.0);
+    return timeout == 0 ? 1 : timeout;	// 0 would mean "do not block at all"
+}
+
 /* rl, rlm are locked on entrance and exit */
 static int32_t __CFRunLoopRun(CFRunLoopRef rl, CFRunLoopModeRef rlm, CFTimeInterval seconds, Boolean stopAfterHandle, CFRunLoopModeRef previousMode) {
     uint64_t startTSR = mach_absolute_time();
@@ -2457,7 +2473,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl, CFRunLoopModeRef rlm, CFTimeInter
             }
             msg = (mach_msg_header_t *)msg_buffer;
             
-            __CFRunLoopServiceMachPort(waitSet, &msg, sizeof(msg_buffer), &livePort, poll ? 0 : TIMEOUT_INFINITY, &voucherState, &voucherCopy);
+            __CFRunLoopServiceMachPort(waitSet, &msg, sizeof(msg_buffer), &livePort, __CFRunLoopWaitTimeout(timeout_context->termTSR, poll), &voucherState, &voucherCopy);
             
             if (modeQueuePort != MACH_PORT_NULL && livePort == modeQueuePort) {
                 // Drain the internal queue. If one of the callout blocks sets the timerFired flag, break out and service the timer.
@@ -2481,7 +2497,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl, CFRunLoopModeRef rlm, CFTimeInter
             memset(msg_buffer, 0, sizeof(msg_buffer));
         }
         msg = (mach_msg_header_t *)msg_buffer;
-        __CFRunLoopServiceMachPort(waitSet, &msg, sizeof(msg_buffer), &livePort, poll ? 0 : TIMEOUT_INFINITY, &voucherState, &voucherCopy);
+        __CFRunLoopServiceMachPort(waitSet, &msg, sizeof(msg_buffer), &livePort, __CFRunLoopWaitTimeout(timeout_context->termTSR, poll), &voucherState, &voucherCopy);
 #endif
         
         
