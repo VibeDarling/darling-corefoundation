@@ -42,6 +42,11 @@
 #include <stdio.h>
 #include <limits.h>
 #include <string.h>
+#if defined(DARLING)
+#include <errno.h>
+#include <stdlib.h>
+#include <unistd.h>
+#endif
 #include "CFInternal.h"
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_WINDOWS
 #include <CoreFoundation/CFStream.h>
@@ -725,7 +730,26 @@ CFIndex __CFBinaryPlistWriteToStreamWithOptions(CFPropertyListRef plist, CFTypeR
 #pragma mark -
 #pragma mark Reading
 
-#define FAIL_FALSE	do { return false; } while (0)
+#if defined(DARLING)
+// Optional rejection-site diagnostics. Never include property-list contents.
+// Keep the private ARM64 spelling as an alias for existing debugging workflows.
+static void __CFBinaryPlistTraceRejection(unsigned line) {
+    int savedErrno = errno;
+    if (getenv("DARLING_CF_BINARY_PLIST_TRACE") || getenv("DARLING_ARM64_PLIST_TRACE")) {
+        char message[96];
+        int length = snprintf(message, sizeof(message),
+            "CFBinaryPList.c:%u: rejected binary plist\n", line);
+        if (length > 0 && (size_t)length < sizeof(message)) {
+            (void)write(STDERR_FILENO, message, (size_t)length);
+        }
+    }
+    errno = savedErrno;
+}
+
+#define FAIL_FALSE do { __CFBinaryPlistTraceRejection(__LINE__); return false; } while (0)
+#else
+#define FAIL_FALSE do { return false; } while (0)
+#endif
 #define FAIL_MAXOFFSET	do { return UINT64_MAX; } while (0)
 
 CF_PRIVATE bool __CFBinaryPlistCreateObjectFiltered(const uint8_t *databytes, uint64_t datalen, uint64_t startOffset, const CFBinaryPlistTrailer *trailer, CFAllocatorRef allocator, CFOptionFlags mutabilityOption, CFMutableDictionaryRef objects, CFMutableSetRef set, CFIndex curDepth, CFSetRef keyPaths, CFPropertyListRef *plist);
@@ -1606,4 +1630,3 @@ if (!CFEqual(pl, pl2)) CFLog(3, CFSTR("*** error: plists before and after are no
     }
     FAIL_FALSE;
 }
-
