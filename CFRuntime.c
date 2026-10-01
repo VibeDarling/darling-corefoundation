@@ -139,6 +139,20 @@ extern void __HALT(void);
 static CFTypeID __kCFNotATypeTypeID = _kCFRuntimeNotATypeID;
 id __NSDictionary0__, __NSArray0__;
 
+struct __NSArray0_struct {
+    void *isa;
+    uintptr_t count;
+};
+CF_EXPORT struct __NSArray0_struct __NSArray0__struct;
+struct __NSArray0_struct __NSArray0__struct = { 0, 0 };
+
+struct __NSDictionary0_struct {
+    void *isa;
+    uintptr_t count;
+};
+CF_EXPORT struct __NSDictionary0_struct __NSDictionary0__struct;
+struct __NSDictionary0_struct __NSDictionary0__struct = { 0, 0 };
+
 #if !defined (__cplusplus)
 static const CFRuntimeClass __CFNotATypeClass = {
     0,
@@ -1171,8 +1185,16 @@ void __CFInitialize(void) {
         clsArray = objc_lookUpClass("NSArray");
         selAlloc = sel_registerName("alloc");
         selInit = sel_registerName("init");
-        __NSDictionary0__ = ((id (*)(id, SEL))objc_msgSend)(((id (*)(id, SEL))objc_msgSend)(clsDict, selAlloc), selInit);
-        __NSArray0__ = ((id (*)(id, SEL))objc_msgSend)(((id (*)(id, SEL))objc_msgSend)(clsArray, selAlloc), selInit);
+        if (clsDict && selAlloc && selInit) {
+            __NSDictionary0__ = ((id (*)(id, SEL))objc_msgSend)(((id (*)(id, SEL))objc_msgSend)(clsDict, selAlloc), selInit);
+            __NSDictionary0__struct.isa = (void*)clsDict;
+            __NSDictionary0__struct.count = 0;
+        }
+        if (clsArray && selAlloc && selInit) {
+            __NSArray0__ = ((id (*)(id, SEL))objc_msgSend)(((id (*)(id, SEL))objc_msgSend)(clsArray, selAlloc), selInit);
+            __NSArray0__struct.isa = (void*)clsArray;
+            __NSArray0__struct.count = 0;
+        }
 
         __CFInitializing = 0;
         __CFInitialized = 1;
