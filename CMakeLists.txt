@@ -100,6 +100,8 @@ set(cf_c_sources
 	CFUniChar.c
 	CFURLAccess.c
 	CFURL.c
+	CFURLComponents.c
+	CFURLComponents_URIParser.c
 	CFURLConstants.c
 	CFUserNotification.c
 	CFUtilities.c
@@ -214,6 +216,8 @@ set_property(TARGET CoreFoundation_arm64 APPEND_STRING PROPERTY
 endif (TARGET_ARM64)
 
 set_source_files_properties(${cf_c_sources} PROPERTIES COMPILE_FLAGS "-x objective-c")
+set_source_files_properties(CFURLComponents.c CFURLComponents_URIParser.c
+    PROPERTIES COMPILE_FLAGS "-x c")
 
 add_darling_executable(plconvert plconvert.c)
 target_link_libraries(plconvert CoreFoundation)
