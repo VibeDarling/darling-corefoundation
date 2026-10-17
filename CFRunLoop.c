@@ -2844,6 +2844,10 @@ void CFRunLoopPerformBlock(CFRunLoopRef rl, CFTypeRef mode, void (^block)(void))
 
 Boolean CFRunLoopContainsSource(CFRunLoopRef rl, CFRunLoopSourceRef rls, CFStringRef modeName) {
     CHECK_FOR_FORK();
+#ifdef DARLING
+    /* See CFRunLoopAddSource: NULL sources are never contained. */
+    if (NULL == rls) return false;
+#endif
     CFRunLoopModeRef rlm;
     Boolean hasValue = false;
     __CFRunLoopLock(rl);
@@ -2865,6 +2869,13 @@ Boolean CFRunLoopContainsSource(CFRunLoopRef rl, CFRunLoopSourceRef rls, CFStrin
 void CFRunLoopAddSource(CFRunLoopRef rl, CFRunLoopSourceRef rls, CFStringRef modeName) {	/* DOES CALLOUT */
     CHECK_FOR_FORK();
     if (__CFRunLoopIsDeallocating(rl)) return;
+#ifdef DARLING
+    /* Darling's IOKit has no iokitd, so notification-port lookups can
+     * legitimately yield NULL where Apple always returns a port.
+     * Ignore NULL sources instead of crashing (matches the fail-soft
+     * guards in IOKitUser). */
+    if (NULL == rls) return;
+#endif
     if (!__CFIsValid(rls)) return;
     Boolean doVer0Callout = false;
     __CFRunLoopLock(rl);
@@ -2926,6 +2937,10 @@ void CFRunLoopAddSource(CFRunLoopRef rl, CFRunLoopSourceRef rls, CFStringRef mod
 
 void CFRunLoopRemoveSource(CFRunLoopRef rl, CFRunLoopSourceRef rls, CFStringRef modeName) {	/* DOES CALLOUT */
     CHECK_FOR_FORK();
+#ifdef DARLING
+    /* See CFRunLoopAddSource: ignore NULL sources. */
+    if (NULL == rls) return;
+#endif
     Boolean doVer0Callout = false, doRLSRelease = false;
     __CFRunLoopLock(rl);
     if (modeName == kCFRunLoopCommonModes) {
