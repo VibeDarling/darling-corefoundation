@@ -168,6 +168,16 @@ static void NSUnrecognizedForwarding() { __asm__("int3"); }
     return [(NSString *)description autorelease];
 }
 
++ (const char *)UTF8String
+{
+    return class_getName(self);
+}
+
++ (NSString *)stringValue
+{
+    return [(NSString *)CFStringCreateWithCString(kCFAllocatorDefault, class_getName(self), kCFStringEncodingUTF8) autorelease];
+}
+
 - (NSString *)description
 {
     CFStringRef description = CFStringCreateWithFormat(kCFAllocatorDefault, NULL, CFSTR("<%s: %p>"), object_getClassName(self), self);
