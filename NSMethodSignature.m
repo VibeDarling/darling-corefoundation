@@ -99,6 +99,63 @@ void __NSARM64ExtendToInt(void *value, const char *type)
 }
 #endif
 
+#if defined(__x86_64__)
+// The SysV ABI returns a float, a double, or a struct of at most 16 bytes holding
+// only floats and doubles in xmm0/xmm1. Mixed structs (rax and xmm0) are not recognised.
+BOOL __NSX86_64ReturnsInSSE(const char *type)
+{
+    type = stripQualifiersAndComments(type);
+    if (*type == _C_FLT || *type == _C_DBL)
+    {
+        return YES;
+    }
+    if (*type != _C_STRUCT_B)
+    {
+        return NO;
+    }
+    NSUInteger size = 0;
+    NSGetSizeAndAlignment(type, &size, NULL);
+    if (size == 0 || size > 16)
+    {
+        return NO;
+    }
+
+    unsigned depth = 0;
+    for (const char *p = type; *p; p++)
+    {
+        if (*p == _C_STRUCT_B)
+        {
+            p = strchr(p, '=');
+            if (p == NULL)
+            {
+                return NO;
+            }
+            depth++;
+        }
+        else if (*p == _C_STRUCT_E)
+        {
+            if (--depth == 0)
+            {
+                return YES;
+            }
+        }
+        else if (*p == '"')
+        {
+            p = strchr(p + 1, '"');
+            if (p == NULL)
+            {
+                return NO;
+            }
+        }
+        else if (*p != _C_FLT && *p != _C_DBL)
+        {
+            return NO;
+        }
+    }
+    return NO;
+}
+#endif
+
 @implementation NSMethodSignature
 
 - (instancetype)initWithObjCTypes:(const char *)types
@@ -225,7 +282,12 @@ void __NSARM64ExtendToInt(void *value, const char *type)
                     // Larger results, other than double aggregates, are returned through x8.
                     _stret = ms->size > 16 && __NSARM64DoubleHFACount(currentType) == 0;
 #else
+#if defined(__x86_64__)
+                    // Up to 16 bytes come back in registers (SysV), as with objc_msgSend.
+                    if (ms->size > 16)
+#else
                     if (frameSize > sizeof(int))
+#endif
                     {
                         // Account for the stret return pointer.
                         _frameLength += sizeof(void *);

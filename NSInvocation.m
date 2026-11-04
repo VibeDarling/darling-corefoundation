@@ -36,6 +36,14 @@
 {
     if (idx == 0)
     {
+#if defined(__x86_64__)
+        // NSInvoke-x86.S and CFForwardingPrep.S keep rax and rdx at offsets
+        // 0 and 8 of _retdata, xmm0 and xmm1 at 16 and 24.
+        if (__NSX86_64ReturnsInSSE([_signature methodReturnType]))
+        {
+            return (void **)((char *)_retdata + 16);
+        }
+#endif
         return _retdata;
     }
 

@@ -216,8 +216,9 @@ __CF_forwarding_prep_1:
     movq %rsp, %rbp
     .cfi_def_cfa_register rbp
 
-    // Copy args from regs into a stack var
-    subq   $0xd0, %rsp
+    // Copy args from regs into a stack var (0x00-0xbf); the return storage
+    // at 0xc0-0xdf holds rax, rdx, xmm0 and xmm1 (see NSInvoke-x86.S).
+    subq   $0xe0, %rsp
     movq   %rax, 0xb0(%rsp)
     movapd %xmm7, 0xa0(%rsp)
     movapd %xmm6, 0x90(%rsp)
@@ -248,8 +249,8 @@ __CF_forwarding_prep_1:
     // here's how we get the return values (see NSInvoke-x86.S)
     movq   0xc0(%rsp), %rax
     movq   0xc8(%rsp), %rdx
-    movapd 0xd0(%rsp), %xmm0
-    movapd 0xe0(%rsp), %xmm1
+    movq   0xd0(%rsp), %xmm0
+    movq   0xd8(%rsp), %xmm1
 
     movq   %rbp, %rsp
     pop    %rbp

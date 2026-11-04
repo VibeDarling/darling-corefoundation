@@ -163,6 +163,9 @@ id ___forwarding___(struct objc_sendv_margs *args, void *returnStorage, void *in
         [inv getReturnValue:returnStorage];
         __NSARM64ExtendToInt(returnStorage, returnType);
     }
+#elif defined(__x86_64__)
+    // CFForwardingPrep.S returns rax/rdx from offsets 0 and 8, xmm0/xmm1 from 16 and 24.
+    [inv getReturnValue:(char *)returnStorage + (__NSX86_64ReturnsInSSE(returnType) ? 16 : 0)];
 #else
     [inv getReturnValue:returnStorage];
 #endif

@@ -14,6 +14,10 @@
 // hfaCount (arm64 only): number of double members returned in d0-d3, 0 if the result is not such an aggregate.
 void __invoke__(void *send, void *retdata, marg_list args, size_t len, char rettype, unsigned hfaCount);
 
+#if defined(__x86_64__)
+BOOL __NSX86_64ReturnsInSSE(const char *type);
+#endif
+
 #if defined(__arm64__)
 unsigned __NSARM64DoubleHFACount(const char *type);
 void __NSARM64ExtendToInt(void *value, const char *type);

@@ -137,9 +137,10 @@ Ldone:
   cmpb $0x44, %cl # if (returnType[0] == 'D') // long double
   je Llongdoubleret
 
-  # double
-  movapd %xmm1, 32(%rsi)
-  movapd %xmm0, 16(%rsi)
+  # float, double and structs of them: xmm0 and xmm1 back to back, so a
+  # two-eightbyte result such as CGPoint reads contiguously from offset 16
+  movq %xmm0, 16(%rsi)
+  movq %xmm1, 24(%rsi)
 
   # int128
   movq %rdx, 8(%rsi)
