@@ -532,6 +532,7 @@ struct __CFRunLoopMode {
     CFMutableArrayRef _timers;
     CFMutableDictionaryRef _portToV1SourceMap;
     __CFPortSet _portSet;
+    __CFPort _dispatchPortInSet; /* Darling: the main queue's port, while _portSet holds it */
     CFIndex _observerMask;
 #if USE_DISPATCH_SOURCE_FOR_TIMERS
     dispatch_source_t _timerSource;
@@ -782,6 +783,7 @@ static CFRunLoopModeRef __CFRunLoopFindMode(CFRunLoopRef rl, CFStringRef modeNam
     rlm->_timers = NULL;
     rlm->_observerMask = 0;
     rlm->_portSet = __CFPortSetAllocate();
+    rlm->_dispatchPortInSet = MACH_PORT_NULL;
     rlm->_timerSoftDeadline = UINT64_MAX;
     rlm->_timerHardDeadline = UINT64_MAX;
     
@@ -2402,7 +2404,6 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl, CFRunLoopModeRef rlm, CFTimeInter
         timeout_context->termTSR = UINT64_MAX;
     }
 
-    Boolean didDispatchPortLastTime = true;
     int32_t retVal = 0;
     do {
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
@@ -2433,20 +2434,6 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl, CFRunLoopModeRef rlm, CFTimeInter
 
         Boolean poll = sourceHandledThisLoop || (0ULL == timeout_context->termTSR);
 
-        if (MACH_PORT_NULL != dispatchPort && !didDispatchPortLastTime) {
-#if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
-            msg = (mach_msg_header_t *)msg_buffer;
-            if (__CFRunLoopServiceMachPort(dispatchPort, &msg, sizeof(msg_buffer), &livePort, 0, &voucherState, NULL)) {
-                goto handle_msg;
-            }
-#elif DEPLOYMENT_TARGET_WINDOWS
-            if (__CFRunLoopWaitForMultipleObjects(NULL, &dispatchPort, 0, 0, &livePort, NULL)) {
-                goto handle_msg;
-            }
-#endif
-        }
-
-        didDispatchPortLastTime = false;
 
 	if (!poll && (rlm->_observerMask & kCFRunLoopBeforeWaiting)) __CFRunLoopDoObservers(rl, rlm, kCFRunLoopBeforeWaiting);
 	__CFRunLoopSetSleeping(rl);
@@ -2455,8 +2442,16 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl, CFRunLoopModeRef rlm, CFTimeInter
         // Must push the local-to-this-activation ports in on every loop
         // iteration, as this mode could be run re-entrantly and we don't
         // want these ports to get serviced.
+        //
+        // Darling: each insert and remove is a darlingserver round trip, so
+        // the port stays in the set while every run of the mode wants it,
+        // and a run that must not service it takes it out.
 
-        __CFPortSetInsert(dispatchPort, waitSet);
+        if (rlm->_dispatchPortInSet != dispatchPort) {
+            if (MACH_PORT_NULL != rlm->_dispatchPortInSet) __CFPortSetRemove(rlm->_dispatchPortInSet, waitSet);
+            if (MACH_PORT_NULL != dispatchPort) __CFPortSetInsert(dispatchPort, waitSet);
+            rlm->_dispatchPortInSet = dispatchPort;
+        }
         
 	__CFRunLoopModeUnlock(rlm);
 	__CFRunLoopUnlock(rl);
@@ -2511,20 +2506,12 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl, CFRunLoopModeRef rlm, CFTimeInter
 
         rl->_sleepTime += (poll ? 0.0 : (CFAbsoluteTimeGetCurrent() - sleepStart));
 
-        // Must remove the local-to-this-activation ports in on every loop
-        // iteration, as this mode could be run re-entrantly and we don't
-        // want these ports to get serviced. Also, we don't want them left
-        // in there if this function returns.
-
-        __CFPortSetRemove(dispatchPort, waitSet);
-        
         __CFRunLoopSetIgnoreWakeUps(rl);
 
         // user callouts now OK again
 	__CFRunLoopUnsetSleeping(rl);
 	if (!poll && (rlm->_observerMask & kCFRunLoopAfterWaiting)) __CFRunLoopDoObservers(rl, rlm, kCFRunLoopAfterWaiting);
 
-        handle_msg:;
         __CFRunLoopSetIgnoreWakeUps(rl);
 
 #if DEPLOYMENT_TARGET_WINDOWS
@@ -2608,7 +2595,6 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl, CFRunLoopModeRef rlm, CFTimeInter
             __CFRunLoopLock(rl);
             __CFRunLoopModeLock(rlm);
             sourceHandledThisLoop = true;
-            didDispatchPortLastTime = true;
         } else {
             CFRUNLOOP_WAKEUP_FOR_SOURCE();
             
@@ -2634,6 +2620,21 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl, CFRunLoopModeRef rlm, CFTimeInter
             _CFSetTSD(__CFTSDKeyMachMessageHasVoucher, previousVoucher, os_release);
             
         } 
+
+        /* Darling: Apple's polls the main queue's port before each wait, so
+           that a port always ready cannot starve it; that poll is a
+           darlingserver round trip on every pass. libdispatch knows without
+           one whether the queue has work (an empty drain returns at once),
+           so the queue is drained after every wake-up instead. */
+        if (MACH_PORT_NULL != dispatchPort && livePort != dispatchPort) {
+            __CFRunLoopModeUnlock(rlm);
+            __CFRunLoopUnlock(rl);
+            _CFSetTSD(__CFTSDKeyIsInGCDMainQ, (void *)6, NULL);
+            __CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__(NULL);
+            _CFSetTSD(__CFTSDKeyIsInGCDMainQ, (void *)0, NULL);
+            __CFRunLoopLock(rl);
+            __CFRunLoopModeLock(rlm);
+        }
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
         if (msg && msg != (mach_msg_header_t *)msg_buffer) free(msg);
 #endif
