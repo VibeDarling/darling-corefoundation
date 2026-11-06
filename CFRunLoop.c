@@ -2402,7 +2402,12 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl, CFRunLoopModeRef rlm, CFTimeInter
         timeout_context->termTSR = UINT64_MAX;
     }
 
-    Boolean didDispatchPortLastTime = true;
+    /* Darling: Apple's starts this true, so the first pass of each run
+       leaves the main queue to whatever the port set returns. Cocotron's
+       event loop runs the loop with no timeout over and over while events
+       are queued, a run is often just that first pass, and with a timer or
+       the display always ready the main queue was never serviced. */
+    Boolean didDispatchPortLastTime = false;
     int32_t retVal = 0;
     do {
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
